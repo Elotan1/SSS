@@ -1,0 +1,12 @@
+[package]
+name = "gaussian"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-ff = "0.4.2"
+ark-std = { version = "0.4.0", features = ["std", "getrandom"]}
+nalgebra = "0.32.5"
+num = { version = "0.4.2", features = ["std"]}
+rand = "0.8.5"
+ark-serialize = { version = "0.4.2", features = ["derive"] }

@@ -1,0 +1,5 @@
+[user]
+	name = Ethan Lotan
+	email = antsoverhere@gmail.com
+[core]
+	autocrlf = true
