@@ -1,4 +1,6 @@
-use sss::{reconstruct_bytes, share_bytes, share_leaks, og_matrix,reconstruct_leak};
+use sss::{reconstruct_bytes, share_bytes, share_leaks, og_matrix,reconstruct_leak, gao};
+use nalgebra::DMatrix;
+use sss::Fq;
 
 // Rust verification software (Regression scheme and formal verification)
 #[test]
@@ -8,7 +10,7 @@ fn singular_secret() {
     let n = 6;
     let c = share_bytes(test_hex, t, n);
     let d = reconstruct_bytes(c.1, t);
-    let a = 0x29;
+    let a = 0x29 % 7;
     assert_eq!(d[0], a);
 }
 
@@ -19,8 +21,8 @@ fn two_secrets() {
     let n = 6;
     let c = share_bytes(test_hex, t, n);
     let d = reconstruct_bytes(c.1, t);
-    let a = 0x29;
-    let b = 0x49;
+    let a = 0x29 % 7;
+    let b = 0x49 % 7;
     assert_eq!(d[0], a);
     assert_eq!(d[1], b);
 }
@@ -32,8 +34,8 @@ fn big_secret() {
     let n = 6;
     let c = share_bytes(test_hex, t, n);
     let d = reconstruct_bytes(c.1, t);
-    let a = 0x49 % 97;
-    let b = 0x6d % 97;
+    let a = 0x49 % 7;
+    let b = 0x6d % 7;
     assert_eq!(d[0], a);
     assert_eq!(d[47], b);
 }
@@ -45,8 +47,8 @@ fn limited_t() {
     let n = 6;
     let c = share_bytes(test_hex, t, n);
     let d = reconstruct_bytes(c.1, t);
-    let a = 0x29;
-    let b = 0x49;
+    let a = 0x29 % 7;
+    let b = 0x49 % 7;
     assert_eq!(d[0], a);
     assert_eq!(d[1], b);
 }
@@ -59,7 +61,7 @@ fn lrss_one_secret_test() {
     let a = og_matrix(t, n);
     let b = share_leaks(test_hex, t, n, a.clone());
     let c = reconstruct_leak(b, t, a);
-    let d = 0x29;
+    let d = 0x29 % 7;
     assert_eq!(c[0], d);
 }
 
@@ -72,8 +74,8 @@ fn lrss_two_secrets_test() {
     let a = og_matrix(t, n);
     let b = share_leaks(test_hex, t, n, a.clone());
     let c = reconstruct_leak(b, t, a);
-    let d = 0x29;
-    let e = 0x49;
+    let d = 0x29 % 7;
+    let e = 0x49 % 7;
     assert_eq!(c[0], d);
     assert_eq!(c[1], e);
 }
@@ -86,8 +88,8 @@ fn big_secret_lrss() {
     let a = og_matrix(t, n);
     let b = share_leaks(test_hex, t, n, a.clone());
     let c = reconstruct_leak(b, t, a);
-    let d = 0x49 % 97;
-    let e = 0x6d % 97;
+    let d = 0x49 % 7;
+    let e = 0x6d % 7;
     assert_eq!(c[0], d);
     assert_eq!(c[47], e);
 }
@@ -100,8 +102,20 @@ fn limited_t_lrss() {
     let a = og_matrix(t, n);
     let b = share_leaks(test_hex, t, n, a.clone());
     let c = reconstruct_leak(b, t, a);
-    let d = 0x29 % 97;
-    let e = 0x49 % 97;
+    let d = 0x29 % 7;
+    let e = 0x49 % 7;
     assert_eq!(c[0], d);
     assert_eq!(c[1], e);
+}
+
+#[test]
+fn Berlekamp() {
+    let test_hex: &[u8; 1] = b"\x2A";
+    let t = 3;
+    let n = 7;
+    let errors = 2;
+    let vec = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(5),Fq::from(3), Fq::from(6), Fq::from(3), Fq::from(2), Fq::from(2)]);
+    let expected = gao(n, vec, errors);
+    let solution = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(6),Fq::from(3), Fq::from(6), Fq::from(1), Fq::from(2), Fq::from(2)]);
+    assert_eq!(expected, solution);
 }

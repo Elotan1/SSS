@@ -4,14 +4,21 @@ extern crate nalgebra as na;
 use crate::Fq;
 use ark_ff::{fields::Field, BigInt};
 use ark_ff::Zero;
+use ark_poly::{Evaluations, Polynomial};
 use ark_std::UniformRand;
 use na::DMatrix;
 use nalgebra::{matrix, vector, zero};
 use num::integer::Roots;
 use std::{default, vec};
 use std::{collections::HashMap, error, thread::current};
-use polynomen::{poly, Poly};
-use rust_polynomial::{self, Monomial, Polynomial};
+use polynomen::{eval_poly_ratio, poly, Poly};
+use ark_poly::univariate::{DensePolynomial, DenseOrSparsePolynomial};
+use ark_std::{
+    fmt,
+    ops::{Add, AddAssign, Deref, DerefMut, Div, Mul, Neg, Sub, SubAssign},
+    rand::Rng,
+    vec::*,
+};
 
 
 // This is the importable function for the Gauss-Jordan Algorithm.
@@ -305,7 +312,7 @@ pub fn share_reconstruction(binned_shares: HashMap<Fq, Vec<Fq>>, threshold: usiz
 // This is the importable function for a Berlekamp Welch Decoder.
 // {Parameters} The function takes in a Hashmap of keys and their values, as well as the threshold value.
 // {Returns} The secret message in the form of a matrix size 1 by the length of the message.
-pub fn decoder(n: usize, codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq> {
+pub fn decoder(n: usize, mut codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq> {
     let mut base = codeword.clone();
     let mut count = 1;
     while count < n {
@@ -437,84 +444,98 @@ pub fn decoder(n: usize, codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq> {
         current_element += 1;
     }
     println!("{:?}", error_holder);
-    let mono_vec: Vec<Monomial<i32>> = vec![
-        Monomial::new(integer_holder[0], 4),
-        Monomial::new(integer_holder[1], 3),
-        Monomial::new(integer_holder[2], 2),
-        Monomial::new(integer_holder[3], 1),
-        Monomial::new(integer_holder[4], 0),
-    ];
-    
-    let error_vec: Vec<Monomial<i32>> = vec![
-        Monomial::new(error_holder[0], 2),
-        Monomial::new(error_holder[1], 1),
-        Monomial::new(error_holder[2], 0),
-    ];
 
-    let mod_point: Vec<Monomial<i32>> = vec![
-        Monomial::new(7, 0),
-    ];
-    
-    let poly: Polynomial<i32> = Polynomial::new(mono_vec);
-    let error_poly: Polynomial<i32> = Polynomial::new(error_vec);
-    let modulus_poly: Polynomial<i32> = Polynomial::new(mod_point);
-    println!("{poly}");
-    println!("{error_poly}");
-    let mut c: (Polynomial<i32>, Polynomial<i32>) = poly.clone() / error_poly.clone();
-    let d = c.0;
-    println!("{d}");
-    println!("{:?}", d[0]);
-    let mut nw: Polynomial<i32> = Polynomial::new(vec![]);
-    nw.push(d[2]);
-    println!("{nw}");
-    let f = d.find_by_exp(1);
-    let g = f + Monomial::new(7, 1);
-    println!("{:?}", g);
-    nw.push(g.expect("REASON"));
-    nw.push(d[0]);
-    println!("{nw}");
+    let mono_vec = DensePolynomial { coeffs: (vec![Fq::from(integer_holder[4]), Fq::from(integer_holder[3]), Fq::from(integer_holder[2]), Fq::from(integer_holder[1]), Fq::from(integer_holder[0])]) };
+    let error_vec = DensePolynomial { coeffs: (vec![Fq::from(Fq::from(error_holder[2])), Fq::from(Fq::from(error_holder[1])), Fq::from(Fq::from(error_holder[0]))]) };
+   
+    println!("{:?}", mono_vec);
+    println!("{:?}", &error_vec);
+    if let Some((quotient, remainder)) = DenseOrSparsePolynomial::divide_with_q_and_r(&mono_vec.into(), &error_vec.clone().into()){
 
-    let true_error_vec: Vec<Monomial<i32>> = vec![
-        Monomial::new(error_holder[0], 2),
-        Monomial::new(error_holder[1], 1),
-        Monomial::new(error_holder[2] - 7, 0),
-    ];
-    let true_error_poly: Polynomial<i32> = Polynomial::new(true_error_vec);
-    let mut e = true_error_poly.roots();   //(&modulus_poly);
-    // let poly: Option<Vec<i32>> = c.0.roots();
-    let mut value = 0;
-    let mut calc = 0;
-    let length = e.clone().unwrap().len();
-    let mut last: Vec<i32> = vec![];
-    while value < length {
-    println!("{:?}", e.clone().unwrap());
-    if e.clone().unwrap()[value] < 0 {
-    let calc = e.clone().unwrap()[value] + 7;
-    println!("{:?}", calc);
-    last.insert(value, calc);
-    } else if e.clone().unwrap()[value] == 7 {
-        let calc = e.clone().unwrap()[value] - 7;
-        println!("{:?}", calc);
-        last.insert(value, calc);
-    } else {
-        let calc = e.clone().unwrap()[value];
-        println!("{:?}", calc);
-        last.insert(value, calc);
+    println!("{:?}", quotient);
+
+    let mut current_equilibrium_point = Fq::from(0);
+    let mut length_indicator: usize = 0;
+    let mut current_roots: usize = 0;
+    let mut error_roots: Vec<Fq> = vec![];
+
+    while length_indicator < n {
+        let y_value = DensePolynomial::evaluate(&error_vec, &current_equilibrium_point);
+        if y_value == Fq::from(0) {
+            error_roots.insert(current_roots,current_equilibrium_point);
+            current_roots += 1;
+        }
+        current_equilibrium_point += Fq::from(1);
+        length_indicator += 1;
     }
-    value += 1;
-}   
-    let mut i = 0;
-    let mut x_value = 0;
-    let mut new_codeword = vec![];
-    
-    while i < n {
-        let sum = nw[0].get_value() * x_value*x_value + nw[1].get_value() * x_value + nw[2].get_value();
-        new_codeword.insert(i, Fq::from(sum));
-        i += 1;
-        x_value += 1;
+    println!("{:?}", error_roots);
+
+    let mut current_equilibrium_point = Fq::from(0);
+    let mut length_indicator: usize = 0;
+    let mut new_codeword: Vec<Fq> = vec![];
+
+    while length_indicator < n {
+        let y_value = DensePolynomial::evaluate(&error_vec, &current_equilibrium_point);
+        new_codeword.insert(length_indicator, Fq::from(0));
+        if y_value == Fq::from(0) {
+            new_codeword[length_indicator] = DensePolynomial::evaluate(&quotient, &current_equilibrium_point);
+        } else {
+            new_codeword[length_indicator] = codeword[length_indicator];
+        }
+        current_equilibrium_point += Fq::from(1);
+        length_indicator += 1;
+        current_roots += 1;
     }
     println!("{:?}", new_codeword);
-    simplify
+
+
+
+
+//     let true_error_vec: Vec<Monomial<i32>> = vec![
+//         Monomial::new(error_holder[0], 2),
+//         Monomial::new(error_holder[1], 1),
+//         Monomial::new(error_holder[2] - 7, 0),
+//     ];
+//     let true_error_poly: Polynomial<i32> = Polynomial::new(true_error_vec);
+//     let mut e = true_error_poly.roots();   //(&modulus_poly);
+//     // let poly: Option<Vec<i32>> = c.0.roots();
+//     let mut value = 0;
+//     let mut calc = 0;
+//     let length = e.clone().unwrap().len();
+//     let mut last: Vec<i32> = vec![];
+//     while value < length {
+//     println!("{:?}", e.clone().unwrap());
+//     if e.clone().unwrap()[value] < 0 {
+//     let calc = e.clone().unwrap()[value] + 7;
+//     println!("{:?}", calc);
+//     last.insert(value, calc);
+//     } else if e.clone().unwrap()[value] == 7 {
+//         let calc = e.clone().unwrap()[value] - 7;
+//         println!("{:?}", calc);
+//         last.insert(value, calc);
+//     } else {
+//         let calc = e.clone().unwrap()[value];
+//         println!("{:?}", calc);
+//         last.insert(value, calc);
+//     }
+//     value += 1;
+// }   
+//     let mut i = 0;
+//     let mut x_value = 0;
+//     let mut new_codeword = vec![];
+    
+//     while i < n {
+//         let sum = nw[0].get_value() * x_value*x_value + nw[1].get_value() * x_value + nw[2].get_value();
+//         new_codeword.insert(i, Fq::from(sum));
+//         i += 1;
+//         x_value += 1;
+//     }
+//     println!("{:?}", new_codeword);
+    let solution: DMatrix<Fq> = DMatrix::from_vec(n, 1, new_codeword);
+    solution}
+    else {
+        panic!("Quotient is undefined");
+    }
 }
 
 // This is the importable function for deconstructing the secret into individual shares.
