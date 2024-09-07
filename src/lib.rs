@@ -15,6 +15,7 @@ use func::share_deconstruction;
 use func::share_reconstruction;
 use func::leakage_deconstruction;
 use func::leaks_reconstruction;
+use func::decoder;
 use itertools::Itertools;
 
 // TODO: thiserror crate for error handling?
@@ -24,7 +25,7 @@ use itertools::Itertools;
 // Field we have currently decided to use. May change later.
 // Correctness should not depend on which field we choose here.
 #[derive(MontConfig)]
-#[modulus = "97"]
+#[modulus = "7"]
 #[generator = "12"]
 pub struct FqConfig;
 pub type Fq = Fp64<MontBackend<FqConfig, 1>>;
@@ -251,4 +252,8 @@ pub fn mds(threshold: usize, n: usize, mut c: DMatrix<Fq>) -> DMatrix<Fq>{
     });
     println!("The matrix is: {c}");
     c
+}
+
+pub fn gao(n: usize, codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq>{
+    return decoder(n, codeword, errors);
 }

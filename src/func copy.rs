@@ -4,15 +4,16 @@ extern crate nalgebra as na;
 use crate::Fq;
 use ark_ff::{fields::Field, BigInt};
 use ark_ff::Zero;
+use ark_poly::multivariate::{SparsePolynomial, SparseTerm, Term, Univariate};
 use ark_std::UniformRand;
 use na::DMatrix;
 use nalgebra::{matrix, vector, zero};
 use num::integer::Roots;
-use std::{default, vec};
+use std::vec;
 use std::{collections::HashMap, error, thread::current};
 use polynomen::{poly, Poly};
-use rust_polynomial::{self, Monomial, Polynomial};
-
+// use rust_polynomial::{self, Monomial, Polynomial};
+use ark_poly::{DenseMVPolynomial, DenseUVPolynomial, Polynomial, Univariate};
 
 // This is the importable function for the Gauss-Jordan Algorithm.
 // {Warning} Not all bugs have been accounted for as of 06/04/2024.
@@ -437,83 +438,64 @@ pub fn decoder(n: usize, codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq> {
         current_element += 1;
     }
     println!("{:?}", error_holder);
-    let mono_vec: Vec<Monomial<i32>> = vec![
-        Monomial::new(integer_holder[0], 4),
-        Monomial::new(integer_holder[1], 3),
-        Monomial::new(integer_holder[2], 2),
-        Monomial::new(integer_holder[3], 1),
-        Monomial::new(integer_holder[4], 0),
-    ];
+    let mono_vec = SparsePolynomial::from_coefficients_vec(1, 
+     vec![
+       (Fq::from(integer_holder[0]), SparseTerm::new(vec![(0,4)])),
+       (Fq::from(integer_holder[1]), SparseTerm::new(vec![(0,3)])),
+       (Fq::from(integer_holder[2]), SparseTerm::new(vec![(0,2)])),
+       (Fq::from(integer_holder[3]), SparseTerm::new(vec![(0,1)])),
+       (Fq::from(integer_holder[4]), SparseTerm::new(vec![(0,0)])),
+    ],);
     
-    let error_vec: Vec<Monomial<i32>> = vec![
-        Monomial::new(error_holder[0], 2),
-        Monomial::new(error_holder[1], 1),
-        Monomial::new(error_holder[2], 0),
-    ];
+    let error_vec = SparsePolynomial::from_coefficients_vec(1, 
+        vec![
+        (Fq::from(error_holder[0]), SparseTerm::new(vec![(0,2)])),
+        (Fq::from(error_holder[1]), SparseTerm::new(vec![(0,1)])),
+        (Fq::from(error_holder[2]), SparseTerm::new(vec![(0,0)])),
+    ],);
 
-    let mod_point: Vec<Monomial<i32>> = vec![
-        Monomial::new(7, 0),
-    ];
-    
-    let poly: Polynomial<i32> = Polynomial::new(mono_vec);
-    let error_poly: Polynomial<i32> = Polynomial::new(error_vec);
-    let modulus_poly: Polynomial<i32> = Polynomial::new(mod_point);
-    println!("{poly}");
-    println!("{error_poly}");
-    let mut c: (Polynomial<i32>, Polynomial<i32>) = poly.clone() / error_poly.clone();
-    let d = c.0;
-    println!("{d}");
-    println!("{:?}", d[0]);
-    let mut nw: Polynomial<i32> = Polynomial::new(vec![]);
-    nw.push(d[2]);
-    println!("{nw}");
-    let f = d.find_by_exp(1);
-    let g = f + Monomial::new(7, 1);
-    println!("{:?}", g);
-    nw.push(g.expect("REASON"));
-    nw.push(d[0]);
-    println!("{nw}");
+    println!("{:?}", mono_vec);
+    println!("{:?}", error_vec);
 
-    let true_error_vec: Vec<Monomial<i32>> = vec![
-        Monomial::new(error_holder[0], 2),
-        Monomial::new(error_holder[1], 1),
-        Monomial::new(error_holder[2] - 7, 0),
-    ];
-    let true_error_poly: Polynomial<i32> = Polynomial::new(true_error_vec);
-    let mut e = true_error_poly.roots();   //(&modulus_poly);
+
+    // let mod_point: Vec<Monomial<i32>> = vec![
+    //     Monomial::new(7, 0),
+    // ];
+    let mut c = mono_vec.divide_with_q_and_r(mono_vec, error_vec);
+    // let d = c.0;
+    println!("{c}");
+
+    // let true_error_vec: Vec<Monomial<i32>> = vec![
+    //     Monomial::new(error_holder[0], 2),
+    //     Monomial::new(error_holder[1], 1),
+    //     Monomial::new(error_holder[2] - 7, 0),
+    // ];
+    // let true_error_poly: Polynomial<i32> = Polynomial::new(true_error_vec);
+   // let mut e = true_error_poly.roots();   //(&modulus_poly);
     // let poly: Option<Vec<i32>> = c.0.roots();
-    let mut value = 0;
-    let mut calc = 0;
-    let length = e.clone().unwrap().len();
-    let mut last: Vec<i32> = vec![];
-    while value < length {
-    println!("{:?}", e.clone().unwrap());
-    if e.clone().unwrap()[value] < 0 {
-    let calc = e.clone().unwrap()[value] + 7;
-    println!("{:?}", calc);
-    last.insert(value, calc);
-    } else if e.clone().unwrap()[value] == 7 {
-        let calc = e.clone().unwrap()[value] - 7;
-        println!("{:?}", calc);
-        last.insert(value, calc);
-    } else {
-        let calc = e.clone().unwrap()[value];
-        println!("{:?}", calc);
-        last.insert(value, calc);
-    }
-    value += 1;
-}   
-    let mut i = 0;
-    let mut x_value = 0;
-    let mut new_codeword = vec![];
+//     let mut value = 0;
+//     let mut calc = 0;
+//     let length = e.clone().unwrap().len();
+//     let mut last: Vec<i32> = vec![];
+//     while value < length {
+//     println!("{:?}", e.clone().unwrap());
+//     if e.clone().unwrap()[value] < 0 {
+//     let calc = e.clone().unwrap()[value] + 7;
+//     println!("{:?}", calc);
+//     last.insert(value, calc);
+//     } else if e.clone().unwrap()[value] == 7 {
+//         let calc = e.clone().unwrap()[value] - 7;
+//         println!("{:?}", calc);
+//         last.insert(value, calc);
+//     } else {
+//         let calc = e.clone().unwrap()[value];
+//         println!("{:?}", calc);
+//         last.insert(value, calc);
+//     }
+//     value += 1;
+// }
     
-    while i < n {
-        let sum = nw[0].get_value() * x_value*x_value + nw[1].get_value() * x_value + nw[2].get_value();
-        new_codeword.insert(i, Fq::from(sum));
-        i += 1;
-        x_value += 1;
-    }
-    println!("{:?}", new_codeword);
+
     simplify
 }
 
