@@ -2,23 +2,16 @@
 // Please note that additional dependencies are also implemented in Cargo.toml.
 extern crate nalgebra as na;
 use crate::Fq;
-use ark_ff::{fields::Field, BigInt};
+use ark_ff::fields::Field;
 use ark_ff::Zero;
-use ark_poly::{Evaluations, Polynomial};
+use ark_poly::Polynomial;
 use ark_std::UniformRand;
 use na::DMatrix;
-use nalgebra::{matrix, vector, zero};
-use num::integer::Roots;
-use std::{default, vec};
-use std::{collections::HashMap, error, thread::current};
-use polynomen::{eval_poly_ratio, poly, Poly};
+use nalgebra::matrix;
+use std::vec;
+use std::collections::HashMap;
 use ark_poly::univariate::{DensePolynomial, DenseOrSparsePolynomial};
-use ark_std::{
-    fmt,
-    ops::{Add, AddAssign, Deref, DerefMut, Div, Mul, Neg, Sub, SubAssign},
-    rand::Rng,
-    vec::*,
-};
+use ark_std::vec::*;
 
 
 // This is the importable function for the Gauss-Jordan Algorithm.
@@ -233,7 +226,7 @@ pub fn vandermonde(binned_shares: HashMap<Fq, Vec<Fq>>, threshold: usize) -> DMa
     let size = threshold;
     let mut col_shift = 2;
 
-    // Finally, we iterate through each column multiplying the key by itself based on the current column number.
+    // Finally, we iterate through each column multiplying the key by itself berlekamp_matrixd on the current column number.
     while col_shift < size {
         let mut row_shift = 0;
         while row_shift < size {
@@ -312,110 +305,120 @@ pub fn share_reconstruction(binned_shares: HashMap<Fq, Vec<Fq>>, threshold: usiz
 // This is the importable function for a Berlekamp Welch Decoder.
 // {Parameters} The function takes in a Hashmap of keys and their values, as well as the threshold value.
 // {Returns} The secret message in the form of a matrix size 1 by the length of the message.
-pub fn decoder(n: usize, mut codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq> {
-    let mut base = codeword.clone();
-    let mut count = 1;
-    while count < n {
-        base = base.insert_column(count, Fq::from(0));
-        count += 1;
+pub fn decoder(number_of_shares: usize, codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq> {
+    if errors == 0 {
+        return codeword;
     }
-    println!("{base}");
-    print!("{codeword}");
-    let mut share_vec = DMatrix::from_vec(1,1,vec![Fq::from(0)]);
+    let mut berlekamp_matrix = codeword.clone();
+    let mut column_number = 1;
+    while column_number < number_of_shares {
+        berlekamp_matrix = berlekamp_matrix.insert_column(column_number, Fq::from(0));
+        column_number += 1;
+    }
+    print!("Current Codeword: {codeword}");
+    let mut vector_of_shares = DMatrix::from_vec(1,1,vec![Fq::from(0)]);
     let mut column = 1;
     let mut element = Fq::from(1);
-    while column < n {
-        share_vec = share_vec.clone().insert_row(column, element);
+    while column < number_of_shares {
+        vector_of_shares = vector_of_shares.clone().insert_row(column, element);
         column += 1;
         element += Fq::from(1);
     }
-    println!("{share_vec}");
+    println!("Vector of Shares: {vector_of_shares}");
     println!("{codeword}");
-    let mut new = codeword.clone();
-    let mut count = 0;
-    while count < n {
-        new[(count,0)] = share_vec[count] * codeword[count]; 
-        count += 1;
+    let mut berlekamp_column_1 = codeword.clone();
+    let mut current_value = 0;
+    while current_value < number_of_shares {
+        berlekamp_column_1[(current_value, 0)] = vector_of_shares[current_value] * codeword[current_value]; 
+        current_value += 1;
     }
-    print!("{new}");
-    base.set_column(1, &new.column(0));
-    let mut col2 = DMatrix::from_vec(1,1,vec![Fq::from(-1)]);
-    let mut count = 1;
-    while count < n {
-        col2 = col2.clone().insert_row(count, Fq::from(-1));
-        count += 1;
+    berlekamp_matrix.set_column(1, &berlekamp_column_1.column(0));
+    let mut berlekamp_column_2 = DMatrix::from_vec(1,1,vec![Fq::from(-1)]);
+    let mut row = 1;
+    while row < number_of_shares {
+        berlekamp_column_2 = berlekamp_column_2.clone().insert_row(row, Fq::from(-1));
+        row += 1;
     }
-    println!("{col2}");
-    base.set_column(2, &col2.column(0));
-    println!("{base}");
-    println!("{share_vec}");
-    let mut count = n - 4;
+    println!("{berlekamp_column_2}");
+    berlekamp_matrix.set_column(2, &berlekamp_column_2.column(0));
+    println!("{berlekamp_matrix}");
+    println!("{vector_of_shares}");
+    if number_of_shares > 3 {
+    let mut berlekamp_power_columns = number_of_shares - 4;
     let mut global_power = 1;
-    while count < n {
-        let mut current_vec = share_vec.clone();
-        let mut power = global_power;
-        while power > 1 {
+    while berlekamp_power_columns < number_of_shares {
+        let mut current_vec = vector_of_shares.clone();
+        let mut current_power = global_power;
+        while current_power > 1 {
             let mut current_row = 0;
-            while current_row < n {
-            let product = share_vec[(current_row, 0)];
+            while current_row < number_of_shares {
+            let product = vector_of_shares[(current_row, 0)];
             current_vec[(current_row, 0)] *= product;
             current_row += 1;
             }
-            power -= 1;
-            println!("current power:{power}");
+            current_power -= 1;
+            println!("current power:{current_power}");
+            
         }
     let current_column = current_vec * Fq::from(-1);
-    base.set_column(count, &current_column.column(0));
-    count += 1;
+    berlekamp_matrix.set_column(berlekamp_power_columns, &current_column.column(0));
+    berlekamp_power_columns += 1;
     global_power += 1;
     println!("next power: {global_power}");
-    println!("{base}");
+    println!("{berlekamp_matrix}");
     }
-    base = base.insert_column(n,Fq::from(0));
+}
+    berlekamp_matrix = berlekamp_matrix.insert_column(number_of_shares, Fq::from(0));
 
     let mut current_row = 0;
-    while current_row < n {
-    base[(current_row, n)] = base[(current_row, 0)] * base[(current_row, 2 + errors)];
+    while current_row < number_of_shares {
+    berlekamp_matrix[(current_row, number_of_shares)] = berlekamp_matrix[(current_row, 0)] * vector_of_shares[current_row] * vector_of_shares[current_row] * Fq::from(-1);
     current_row += 1;
     }
-    println!("{base}");
-    let simplify = gaussian(base.clone(), n);
-    println!("{simplify}");
+    println!("{berlekamp_matrix}");
+    let berlekamp_matrix_rref = gaussian(berlekamp_matrix.clone(), number_of_shares);
+    println!("RRef: {berlekamp_matrix_rref}");
 
-    let mut polynomial_max = n - 1 - errors;
-    let mut q_vector = vec![simplify[(n-1,n)]];
-    let mut e_vector = vec![simplify[(n - polynomial_max - errors, n)]];
-    let mut current_row = n - errors;
+
+    let mut polynomial_max = number_of_shares - errors;
+    let error_count = number_of_shares - polynomial_max;
+    let mut q_vector = vec![berlekamp_matrix_rref[(number_of_shares - 1, number_of_shares)]];
+    let mut e_vector = vec![berlekamp_matrix_rref[(error_count - 1, number_of_shares)]];
+    let mut current_row = number_of_shares - 2;
     let mut index = 1;
     
-    while polynomial_max > 0 {
-        q_vector.insert(index,simplify[(current_row,n)]);
-    polynomial_max -= 1;
-    current_row -= 1;
-    index += 1;
-    }
-    let mut e = 1;
-    let mut index = 1;
-    let mut current_row = errors;
-    while e < errors {
-        e_vector.insert(index, simplify[(current_row,n)]);
+    println!("number of shares {number_of_shares}");
+    println!("q)vector {:?}", q_vector);
+    println!("e)vector {:?}", e_vector);
+
+    println!("{berlekamp_matrix_rref}");
+
+    while polynomial_max > 1 {
+        println!("current row: {current_row}");
+        q_vector.insert(index, berlekamp_matrix_rref[(current_row, number_of_shares)]);
+        polynomial_max -= 1;
         current_row -= 1;
         index += 1;
-        e += 1;
+    }
+    let mut error_total = 1;
+    let mut index = 1;
+    let mut current_row = errors;
+    while error_total < errors {
+        e_vector.insert(index, berlekamp_matrix_rref[(current_row, number_of_shares)]);
+        current_row -= 1;
+        index += 1;
+        error_total += 1;
     }
         e_vector.insert(0, Fq::from(1));
     println!("{:?}", q_vector);
     println!("{:?}", e_vector);
-    let c = q_vector[0] + e_vector[2];
 
-    let mut integer_value = 0;
     let mut integer_holder = vec![];
-    let mut big_int_value = simplify[(n-1,0)];
-    let mut vector_length = q_vector.len();
+    let vector_length = q_vector.len();
     let mut current_element = 0;
     while current_element < vector_length {
-        integer_value = 0;
-        big_int_value = simplify[(n-1,0)];
+        let mut integer_value = 0;
+        let mut big_int_value = berlekamp_matrix_rref[(number_of_shares - 1,0)];
         integer_holder.insert(current_element, 0);
         while big_int_value != q_vector[current_element] {
             big_int_value += Fq::from(1);
@@ -426,15 +429,12 @@ pub fn decoder(n: usize, mut codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq
     }
     println!("{:?}", integer_holder);
 
-
-    let mut integer_value = 0;
     let mut error_holder: Vec<i32> = vec![];
-    let mut big_int_value = simplify[(n-1,0)];
-    let mut vector_length = e_vector.len();
+    let vector_length = e_vector.len();
     let mut current_element = 0;
     while current_element < vector_length {
-        integer_value = 0;
-        big_int_value = simplify[(n-1,0)];
+        let mut integer_value = 0;
+        let mut big_int_value = berlekamp_matrix_rref[(number_of_shares - 1,0)];
         error_holder.insert(current_element, 0);
         while big_int_value != e_vector[current_element] {
             big_int_value += Fq::from(1);
@@ -445,22 +445,39 @@ pub fn decoder(n: usize, mut codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq
     }
     println!("{:?}", error_holder);
 
-    let mono_vec = DensePolynomial { coeffs: (vec![Fq::from(integer_holder[4]), Fq::from(integer_holder[3]), Fq::from(integer_holder[2]), Fq::from(integer_holder[1]), Fq::from(integer_holder[0])]) };
-    let error_vec = DensePolynomial { coeffs: (vec![Fq::from(Fq::from(error_holder[2])), Fq::from(Fq::from(error_holder[1])), Fq::from(Fq::from(error_holder[0]))]) };
-   
-    println!("{:?}", mono_vec);
-    println!("{:?}", &error_vec);
-    if let Some((quotient, remainder)) = DenseOrSparsePolynomial::divide_with_q_and_r(&mono_vec.into(), &error_vec.clone().into()){
+    let mut truthful_share_polynomial = DensePolynomial {coeffs: (vec![])};
+    let mut current_polynomial_length = integer_holder.len();
+    while current_polynomial_length > 0{
+        truthful_share_polynomial.coeffs.push(Fq::from(integer_holder[current_polynomial_length - 1]));
+        current_polynomial_length -= 1;
+    }
 
-    println!("{:?}", quotient);
+    let mut malicious_error_polynomial = DensePolynomial {coeffs: (vec![])};
+    current_polynomial_length = error_holder.len();
+
+    while current_polynomial_length > 0 {
+        malicious_error_polynomial.coeffs.push(Fq::from(error_holder[current_polynomial_length - 1]));
+        current_polynomial_length -= 1;
+    }
+    println!("{:?}", truthful_share_polynomial);
+    println!("{:?}", malicious_error_polynomial);
+
+    if let Some((quotient, remainder)) = DenseOrSparsePolynomial::divide_with_q_and_r(&truthful_share_polynomial.into(), &malicious_error_polynomial.clone().into()){
+
+    println!("Quotient: {:?}", quotient);
+    println!("Remainder: {:?}", remainder);
+
+    if remainder != (DensePolynomial {coeffs: (vec![])}) {
+        panic!("An unccorectable error has been detected (Remainder is non-zero)");
+    }
 
     let mut current_equilibrium_point = Fq::from(0);
     let mut length_indicator: usize = 0;
     let mut current_roots: usize = 0;
     let mut error_roots: Vec<Fq> = vec![];
 
-    while length_indicator < n {
-        let y_value = DensePolynomial::evaluate(&error_vec, &current_equilibrium_point);
+    while length_indicator < number_of_shares {
+        let y_value = DensePolynomial::evaluate(&malicious_error_polynomial, &current_equilibrium_point);
         if y_value == Fq::from(0) {
             error_roots.insert(current_roots,current_equilibrium_point);
             current_roots += 1;
@@ -474,8 +491,8 @@ pub fn decoder(n: usize, mut codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq
     let mut length_indicator: usize = 0;
     let mut new_codeword: Vec<Fq> = vec![];
 
-    while length_indicator < n {
-        let y_value = DensePolynomial::evaluate(&error_vec, &current_equilibrium_point);
+    while length_indicator < number_of_shares {
+        let y_value = DensePolynomial::evaluate(&malicious_error_polynomial, &current_equilibrium_point);
         new_codeword.insert(length_indicator, Fq::from(0));
         if y_value == Fq::from(0) {
             new_codeword[length_indicator] = DensePolynomial::evaluate(&quotient, &current_equilibrium_point);
@@ -488,50 +505,7 @@ pub fn decoder(n: usize, mut codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq
     }
     println!("{:?}", new_codeword);
 
-
-
-
-//     let true_error_vec: Vec<Monomial<i32>> = vec![
-//         Monomial::new(error_holder[0], 2),
-//         Monomial::new(error_holder[1], 1),
-//         Monomial::new(error_holder[2] - 7, 0),
-//     ];
-//     let true_error_poly: Polynomial<i32> = Polynomial::new(true_error_vec);
-//     let mut e = true_error_poly.roots();   //(&modulus_poly);
-//     // let poly: Option<Vec<i32>> = c.0.roots();
-//     let mut value = 0;
-//     let mut calc = 0;
-//     let length = e.clone().unwrap().len();
-//     let mut last: Vec<i32> = vec![];
-//     while value < length {
-//     println!("{:?}", e.clone().unwrap());
-//     if e.clone().unwrap()[value] < 0 {
-//     let calc = e.clone().unwrap()[value] + 7;
-//     println!("{:?}", calc);
-//     last.insert(value, calc);
-//     } else if e.clone().unwrap()[value] == 7 {
-//         let calc = e.clone().unwrap()[value] - 7;
-//         println!("{:?}", calc);
-//         last.insert(value, calc);
-//     } else {
-//         let calc = e.clone().unwrap()[value];
-//         println!("{:?}", calc);
-//         last.insert(value, calc);
-//     }
-//     value += 1;
-// }   
-//     let mut i = 0;
-//     let mut x_value = 0;
-//     let mut new_codeword = vec![];
-    
-//     while i < n {
-//         let sum = nw[0].get_value() * x_value*x_value + nw[1].get_value() * x_value + nw[2].get_value();
-//         new_codeword.insert(i, Fq::from(sum));
-//         i += 1;
-//         x_value += 1;
-//     }
-//     println!("{:?}", new_codeword);
-    let solution: DMatrix<Fq> = DMatrix::from_vec(n, 1, new_codeword);
+    let solution: DMatrix<Fq> = DMatrix::from_vec(number_of_shares, 1, new_codeword);
     solution}
     else {
         panic!("Quotient is undefined");
@@ -543,16 +517,16 @@ pub fn decoder(n: usize, mut codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq
 // {Returns} A matrix containing the number of shares and their values (number of shares by 2)
 pub fn share_deconstruction(msg: Fq, threshold: usize, n: usize) -> (DMatrix<Fq>, DMatrix<Fq>) {
     let mut rng = ark_std::test_rng();
-    let mut base = DMatrix::from_vec(1, 1, vec![msg]);
+    let mut berlekamp_matrix = DMatrix::from_vec(1, 1, vec![msg]);
     let mut count = 1;
 
     // Let's sample uniformly random field elements with the original message as the first element in the vector:
     while count < threshold {
         let a = Fq::rand(&mut rng);
-        base = base.insert_row(count, a);
+        berlekamp_matrix = berlekamp_matrix.insert_row(count, a);
         count += 1;
     }
-    println!("The message and random coefficients are: {base}");
+    println!("The message and random coefficients are: {berlekamp_matrix}");
 
     // Ensures that the number of shares is not less than the given threshold.
     assert!(n >= threshold);
@@ -598,7 +572,7 @@ pub fn share_deconstruction(msg: Fq, threshold: usize, n: usize) -> (DMatrix<Fq>
     println!("The vandermonde matrix is: {vander}");
 
     // Creates a matrix of tuples with the current share number and value vector.
-    let end = vander * base.clone();
+    let end = vander * berlekamp_matrix.clone();
     println!("The share values are: {end}");
     let mut scope = end.clone().insert_columns(0, 1, Fq::from(1));
     let mut count = 1;
@@ -609,24 +583,24 @@ pub fn share_deconstruction(msg: Fq, threshold: usize, n: usize) -> (DMatrix<Fq>
         val += 1;
     }
     println!("Number of shares and their values: {scope}");
-    (base, scope)
+    (berlekamp_matrix, scope)
 }
 
 
 pub fn leakage_deconstruction(msg: Fq, threshold: usize, original: DMatrix<Fq>) -> DMatrix<Fq> {
         let mut rng = ark_std::test_rng();
-        let mut base = DMatrix::from_vec(1, 1, vec![msg]);
+        let mut berlekamp_matrix = DMatrix::from_vec(1, 1, vec![msg]);
         let mut count = 1;
 
     // Let's sample uniformly random field elements with the original message as the first element in the vector:
     while count < threshold {
         let a = Fq::rand(&mut rng);
-        base = base.insert_column(count, a);
+        berlekamp_matrix = berlekamp_matrix.insert_column(count, a);
         count += 1;
     }
-    println!("The message and random coefficients are: {base}");
+    println!("The message and random coefficients are: {berlekamp_matrix}");
     
-    let result = base * original.clone();
+    let result = berlekamp_matrix * original.clone();
     println!("The product is: {result}");
     result
 }

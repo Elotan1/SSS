@@ -1,7 +1,6 @@
 use sss::{reconstruct_bytes, share_bytes, share_leaks, og_matrix,reconstruct_leak, gao};
 use nalgebra::DMatrix;
 use sss::Fq;
-
 // Rust verification software (Regression scheme and formal verification)
 #[test]
 fn singular_secret() {
@@ -109,13 +108,49 @@ fn limited_t_lrss() {
 }
 
 #[test]
-fn Berlekamp() {
-    let test_hex: &[u8; 1] = b"\x2A";
-    let t = 3;
+fn berlekamp() {
     let n = 7;
     let errors = 2;
     let vec = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(5),Fq::from(3), Fq::from(6), Fq::from(3), Fq::from(2), Fq::from(2)]);
     let expected = gao(n, vec, errors);
     let solution = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(6),Fq::from(3), Fq::from(6), Fq::from(1), Fq::from(2), Fq::from(2)]);
+    assert_eq!(expected, solution);
+}
+
+#[test]
+fn berlekamp_2() {
+    let n = 7;
+    let errors = 2;
+    let vec = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(6), Fq::from(123), Fq::from(456), Fq::from(57), Fq::from(86), Fq::from(121)]);
+    let expected = gao(n, vec, errors);
+    let solution = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(6),Fq::from(3), Fq::from(6), Fq::from(1), Fq::from(2), Fq::from(2)]);
+    assert_eq!(expected, solution);
+}
+
+#[test]
+fn berlekamp_zero_errors() {
+    let n = 7;
+    let errors = 0;
+    let vec = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(6),Fq::from(3), Fq::from(6), Fq::from(1), Fq::from(2), Fq::from(2)]);
+    let expected = gao(n, vec.clone(), errors);
+    assert_eq!(expected, vec);
+}
+
+#[test]
+#[should_panic]
+fn berlekamp_non_zero_remainder() {
+    let n = 7;
+    let errors = 2;
+    let vec = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(2), Fq::from(2), Fq::from(3), Fq::from(1), Fq::from(2), Fq::from(5)]);
+    gao(n, vec.clone(), errors);
+}
+
+#[test]
+fn berlekamp_simple_equation() {
+    let n = 7;
+    let errors = 2;
+    let vec = DMatrix::from_vec(7, 1, vec![Fq::from(4), Fq::from(1), Fq::from(4), Fq::from(2), Fq::from(2), Fq::from(5), Fq::from(1)]);
+    let expected = gao(n,vec,errors);
+    let solution = DMatrix::from_vec(7, 1, vec![Fq::from(0), Fq::from(1), Fq::from(4), Fq::from(2), Fq::from(2), Fq::from(4), Fq::from(1)]);
     assert_eq!(expected, solution);
 }

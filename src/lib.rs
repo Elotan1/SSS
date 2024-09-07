@@ -70,7 +70,6 @@ pub fn share_field_element(msg: Fq, t: usize, n: usize) -> (Vec<Fq>, Vec<Share>)
     }
     let mut coefficient = vec![];
     let mut count = 0;
-    let mut val = 1;
     while count < base.len() {
         coefficient.insert(count, base[count]);
         count += 1;
