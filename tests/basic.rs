@@ -1,4 +1,4 @@
-use sss::{reconstruct_bytes, share_bytes, share_leaks, og_matrix,reconstruct_leak, gao};
+use sss::{deconstruct_leaks, gao, og_matrix, reconstruct_bytes, reconstruct_leak, share_bytes, share_leaks};
 use nalgebra::DMatrix;
 use sss::Fq;
 // Rust verification software (Regression scheme and formal verification)
@@ -153,4 +153,24 @@ fn berlekamp_simple_equation() {
     let expected = gao(n,vec,errors);
     let solution = DMatrix::from_vec(7, 1, vec![Fq::from(0), Fq::from(1), Fq::from(4), Fq::from(2), Fq::from(2), Fq::from(4), Fq::from(1)]);
     assert_eq!(expected, solution);
+}
+
+#[test]
+fn berlekamp_with_shamirs() {
+    let test_hex: &[u8; 2] = b"\x29\x49";
+    let t = 6;
+    let n = 6;
+    let a = og_matrix(t, n);
+    let c = share_leaks(test_hex, t, n, a.clone());
+    let errors = 2;
+    let vec = Vec::from_iter(c.keys());
+    println!("VECTOR {:?}", vec);
+    // let expected = gao(n,vec,errors);
+    // let solution = DMatrix::from_vec(7, 1, vec![Fq::from(0), Fq::from(1), Fq::from(4), Fq::from(2), Fq::from(2), Fq::from(4), Fq::from(1)]);
+    // assert_eq!(expected, solution);
+    let d = reconstruct_leak(c, t, a);
+    let f = 0x29 % 7;
+    let e = 0x49 % 7;
+    assert_eq!(d[0], f);
+    assert_eq!(d[1], e);
 }

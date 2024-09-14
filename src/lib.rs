@@ -253,6 +253,6 @@ pub fn mds(threshold: usize, n: usize, mut c: DMatrix<Fq>) -> DMatrix<Fq>{
     c
 }
 
-pub fn gao(n: usize, codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq>{
+pub fn gao(n: usize, codeword: HashMap<Fq, Vec<Fq>>, errors: usize) -> DMatrix<Fq>{
     return decoder(n, codeword, errors);
 }

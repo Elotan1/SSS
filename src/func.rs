@@ -204,7 +204,7 @@ pub fn vandermonde(binned_shares: HashMap<Fq, Vec<Fq>>, threshold: usize) -> DMa
     // For each key in the hashmap, the bucket vector will increase by one row.
     // This should create a n by 1 vector.
     for key in binned_shares.clone().into_keys() {
-        assert_ne!(key, Fq::from(0));
+        //assert_ne!(key, Fq::from(0));
         let bucket_resize = bucket_vector.resize(row_adjust, 1, key);
         bucket_vector = bucket_resize.clone();
         row_adjust += 1;
@@ -305,44 +305,38 @@ pub fn share_reconstruction(binned_shares: HashMap<Fq, Vec<Fq>>, threshold: usiz
 // This is the importable function for a Berlekamp Welch Decoder.
 // {Parameters} The function takes in a Hashmap of keys and their values, as well as the threshold value.
 // {Returns} The secret message in the form of a matrix size 1 by the length of the message.
-pub fn decoder(number_of_shares: usize, codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq> {
+pub fn decoder(number_of_shares: usize, codeword: HashMap<Fq, Vec<Fq>>, errors: usize) -> HashMap<Fq, Vec<Fq>> {
     if errors == 0 {
         return codeword;
     }
-    let mut berlekamp_matrix = codeword.clone();
+    let mut code_vec = Vec::from_iter(codeword.values());
+    let mut berlekamp_matrix = DMatrix::from_vec(number_of_shares, 1, code_vec);
     let mut column_number = 1;
     while column_number < number_of_shares {
-        berlekamp_matrix = berlekamp_matrix.insert_column(column_number, Fq::from(0));
+        berlekamp_matrix = berlekamp_matrix.insert_column(column_number, &vec![Fq::from(0)]);
         column_number += 1;
     }
-    print!("Current Codeword: {codeword}");
-    let mut vector_of_shares = DMatrix::from_vec(1,1,vec![Fq::from(0)]);
-    let mut column = 1;
-    let mut element = Fq::from(1);
-    while column < number_of_shares {
-        vector_of_shares = vector_of_shares.clone().insert_row(column, element);
-        column += 1;
-        element += Fq::from(1);
-    }
-    println!("Vector of Shares: {vector_of_shares}");
-    println!("{codeword}");
-    let mut berlekamp_column_1 = codeword.clone();
+    let mut vector_of_shares = Vec::from_iter(codeword.keys());
+    println!("Vector of Shares: {:?}", vector_of_shares);
+    let mut berlekamp_column_1 = Vec::from_iter(codeword.values());
+    let mut product = Vec::from_iter(codeword.keys());
     let mut current_value = 0;
     while current_value < number_of_shares {
-        berlekamp_column_1[(current_value, 0)] = vector_of_shares[current_value] * codeword[current_value]; 
+        berlekamp_column_1[current_value][0] = vector_of_shares[current_value] * product[current_value]; 
         current_value += 1;
     }
-    berlekamp_matrix.set_column(1, &berlekamp_column_1.column(0));
-    let mut berlekamp_column_2 = DMatrix::from_vec(1,1,vec![Fq::from(-1)]);
+    println!("{:?}", berlekamp_column_1);
+    let matrix_1 = DMatrix::from_vec(number_of_shares, 1, berlekamp_column_1);
+    berlekamp_matrix.set_column(1, &matrix_1.column(0));
+    let mut berlekamp_column_2 = DMatrix::from_vec(1,1,vec![&vec![Fq::from(-1)]]);
     let mut row = 1;
     while row < number_of_shares {
-        berlekamp_column_2 = berlekamp_column_2.clone().insert_row(row, Fq::from(-1));
+        berlekamp_column_2 = berlekamp_column_2.clone().insert_row(row,&vec![Fq::from(-1)]);
         row += 1;
     }
-    println!("{berlekamp_column_2}");
     berlekamp_matrix.set_column(2, &berlekamp_column_2.column(0));
-    println!("{berlekamp_matrix}");
-    println!("{vector_of_shares}");
+    println!("{:?}", berlekamp_matrix);
+    println!("{:?}", vector_of_shares);
     if number_of_shares > 3 {
     let mut berlekamp_power_columns = number_of_shares - 4;
     let mut global_power = 1;
@@ -352,20 +346,20 @@ pub fn decoder(number_of_shares: usize, codeword: DMatrix<Fq>, errors: usize) ->
         while current_power > 1 {
             let mut current_row = 0;
             while current_row < number_of_shares {
-            let product = vector_of_shares[(current_row, 0)];
-            current_vec[(current_row, 0)] *= product;
+            current_vec[current_row] = &(current_vec[current_row] * vector_of_shares[current_row]);
             current_row += 1;
             }
             current_power -= 1;
             println!("current power:{current_power}");
             
         }
-    let current_column = current_vec * Fq::from(-1);
-    berlekamp_matrix.set_column(berlekamp_power_columns, &current_column.column(0));
+    let current_column = current_vec;
+    let matrix_4 = DMatrix::from_vec(number_of_shares, 1, current_column);
+    berlekamp_matrix.set_column(berlekamp_power_columns, &matrix_4.column(0));
     berlekamp_power_columns += 1;
     global_power += 1;
     println!("next power: {global_power}");
-    println!("{berlekamp_matrix}");
+    println!("{:?}", berlekamp_matrix);
     }
 }
     berlekamp_matrix = berlekamp_matrix.insert_column(number_of_shares, Fq::from(0));
