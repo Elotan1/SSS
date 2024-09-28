@@ -8,6 +8,7 @@ use ark_poly::Polynomial;
 use ark_std::UniformRand;
 use na::DMatrix;
 use nalgebra::matrix;
+use rand::thread_rng;
 use std::vec;
 use std::collections::HashMap;
 use ark_poly::univariate::{DensePolynomial, DenseOrSparsePolynomial};
@@ -226,7 +227,7 @@ pub fn vandermonde(binned_shares: HashMap<Fq, Vec<Fq>>, threshold: usize) -> DMa
     let size = threshold;
     let mut col_shift = 2;
 
-    // Finally, we iterate through each column multiplying the key by itself berlekamp_matrixd on the current column number.
+    // Finally, we iterate through each column multiplying the key by itself based on the current column number.
     while col_shift < size {
         let mut row_shift = 0;
         while row_shift < size {
@@ -519,17 +520,17 @@ pub fn decoder(number_of_shares: usize, codeword: DMatrix<Fq>, errors: usize) ->
 // {Parameters} The function takes in the original message, the threshold, and the number of shares.
 // {Returns} A matrix containing the number of shares and their values (number of shares by 2)
 pub fn share_deconstruction(msg: Fq, threshold: usize, n: usize) -> (DMatrix<Fq>, DMatrix<Fq>) {
-    let mut rng = ark_std::test_rng();
-    let mut berlekamp_matrix = DMatrix::from_vec(1, 1, vec![msg]);
+    let mut rng = thread_rng();
+    let mut matrix = DMatrix::from_vec(1, 1, vec![msg]);
     let mut count = 1;
 
     // Let's sample uniformly random field elements with the original message as the first element in the vector:
     while count < threshold {
         let a = Fq::rand(&mut rng);
-        berlekamp_matrix = berlekamp_matrix.insert_row(count, a);
+        matrix = matrix.insert_row(count, a);
         count += 1;
     }
-    println!("The message and random coefficients are: {berlekamp_matrix}");
+    println!("The message and random coefficients are: {matrix}");
 
     // Ensures that the number of shares is not less than the given threshold.
     assert!(n >= threshold);
@@ -575,7 +576,7 @@ pub fn share_deconstruction(msg: Fq, threshold: usize, n: usize) -> (DMatrix<Fq>
     println!("The vandermonde matrix is: {vander}");
 
     // Creates a matrix of tuples with the current share number and value vector.
-    let end = vander * berlekamp_matrix.clone();
+    let end = vander * matrix.clone();
     println!("The share values are: {end}");
     let mut scope = end.clone().insert_columns(0, 1, Fq::from(1));
     let mut count = 1;
@@ -586,24 +587,24 @@ pub fn share_deconstruction(msg: Fq, threshold: usize, n: usize) -> (DMatrix<Fq>
         val += 1;
     }
     println!("Number of shares and their values: {scope}");
-    (berlekamp_matrix, scope)
+    (matrix, scope)
 }
 
 
 pub fn leakage_deconstruction(msg: Fq, threshold: usize, original: DMatrix<Fq>) -> DMatrix<Fq> {
-        let mut rng = ark_std::test_rng();
-        let mut berlekamp_matrix = DMatrix::from_vec(1, 1, vec![msg]);
+        let mut rng = thread_rng();
+        let mut matrix = DMatrix::from_vec(1, 1, vec![msg]);
         let mut count = 1;
 
     // Let's sample uniformly random field elements with the original message as the first element in the vector:
     while count < threshold {
         let a = Fq::rand(&mut rng);
-        berlekamp_matrix = berlekamp_matrix.insert_column(count, a);
+        matrix = matrix.insert_column(count, a);
         count += 1;
     }
-    println!("The message and random coefficients are: {berlekamp_matrix}");
+    println!("The message and random coefficients are: {matrix}");
     
-    let result = berlekamp_matrix * original.clone();
+    let result = matrix * original.clone();
     println!("The product is: {result}");
     result
 }

@@ -1,45 +1,21 @@
-use sss::{og_matrix, share_leaks};
+use std::os::windows::thread;
+
+use rand::{thread_rng, Rng};
+use sss::Fq;
+use ark_ff::UniformRand;
+use sss::{commitment, reconstruct_bytes, share_bytes};
 //sss::{mds, og_matrix, reconstruct_bytes, reconstruct_leak, share_bytes, share_leaks};
 
 fn main() {
     let test_hex: &[u8; 1] = b"\x29";
+    let mut rng = thread_rng();
+    let r_msg = u8::rand(&mut rng);
+    println!("{:?}", r_msg);
     let t = 6;
     let n = 6;
-    let a = og_matrix(t, n);
-    let c = share_leaks(test_hex, t, n, a.clone());
-    let vec = Vec::from_iter(c.keys());
-    let vec2 = Vec::from_iter(c.values());
-    println!("VECTOR {:?}", vec);
-    println!("VECTOR {:?}", vec2);
-
-
-
-
-
-
-
-
-
-    // let zero = Fq::from(0u8);
-    // println!("zero in F_257 = {}", zero); // seems to be Display bug with Fp<MontBackend<FqConfig,1>,1>
-    // let zero: BigInt<1> = BigInt::from(0u8);
-    // println!("{}", zero); // not a bug with BigInt<_>
-
-    // let test_hex: &[u8; 2] = b"\x29\x49";
-    // let t = 3;
-    // let n = 7;
-    // let errors = 2;
-    // let vec = DMatrix::from_vec(7, 1, vec![Fq::from(1), Fq::from(5),Fq::from(3), Fq::from(6), Fq::from(3), Fq::from(2), Fq::from(2)]);
-    // let c = share_bytes(test_hex, t, n);
-    // println!("COFFS {:?}", c.0);
-    // println!("C_1{:?}", c.1);
-    // let code = gao(n, vec, errors);
+    let c = commitment(test_hex, &[r_msg], t, n);
+    println!("{:?}", c);
     // let d = reconstruct_bytes(c.1, t);
-    // println!("{:?}", d);
-    // let a = og_matrix(t, n);
-    // let p = DMatrix::from_vec(2, 4, vec![Fq::from(1), Fq::from(0), Fq::from(0), Fq::from(1), Fq::from(0), Fq::from(52), Fq::from(0), Fq::from(69)]);
-    // println!("{p}");
-    // let a = mds(t, n, p);
-    // let b = share_leaks(test_hex, t, n, a.clone());
-    // reconstruct_leak(b, t, a);
+    // // let e = 41 % 7;
+    // assert_eq!(d[0], r_msg%7);
  }

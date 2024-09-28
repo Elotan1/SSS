@@ -256,3 +256,41 @@ pub fn mds(threshold: usize, n: usize, mut c: DMatrix<Fq>) -> DMatrix<Fq>{
 pub fn gao(n: usize, codeword: DMatrix<Fq>, errors: usize) -> DMatrix<Fq>{
     return decoder(n, codeword, errors);
 }
+
+pub fn commitment(msg: &[u8], rmsg: &[u8], t: usize, n: usize) -> (HashMap<Fq, Vec<Fq>>, HashMap<Fq, Vec<Fq>>) {
+    // secret share each byte,
+    // then bin shares into the binned_shares HashMap by evaluation point (x coordinate)
+    let mut binned_shares: HashMap<Fq, Vec<Fq>> = HashMap::new();
+    let mut coefficients: Vec<Vec<Fq>> = vec![vec![]];
+    msg.iter().for_each(|byte| {
+            let (coeffs, shares) =  share_field_element(Fq::from(*byte), t, n);
+            shares.into_iter().for_each(|s| {
+                // if the x coordinate of s already a key in binned_shares, then just push the y value of s to binned_shares[x]
+                if let Some(share_bin) = binned_shares.get_mut(&s.x) {
+                    share_bin.push(s.y);
+                } else {
+                    binned_shares.insert(s.x, vec![s.y]);
+                }
+            });
+            coefficients.push(coeffs);
+        });
+        coefficients.remove(0);
+
+
+    let mut random_bin: HashMap<Fq, Vec<Fq>> = HashMap::new();
+    let mut random_coefficients: Vec<Vec<Fq>> = vec![vec![]];
+    rmsg.iter().for_each(|byte| {
+            let (random_coeffs, random_shares) =  share_field_element(Fq::from(*byte), t, n);
+            random_shares.into_iter().for_each(|s| {
+                // if the x coordinate of s already a key in binned_shares, then just push the y value of s to binned_shares[x]
+                if let Some(share_bin) = random_bin.get_mut(&s.x) {
+                    share_bin.push(s.y);
+                } else {
+                    random_bin.insert(s.x, vec![s.y]);
+                }
+            });
+            random_coefficients.push(random_coeffs);
+        });
+        random_coefficients.remove(0);
+    (binned_shares, random_bin)
+}
