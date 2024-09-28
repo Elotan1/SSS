@@ -1,15 +1,12 @@
-use sss::{gao, share_bytes, reconstruct_bytes, og_matrix, share_leaks};
+use sss::{og_matrix, share_leaks};
 //sss::{mds, og_matrix, reconstruct_bytes, reconstruct_leak, share_bytes, share_leaks};
-use sss::Fq;
-use nalgebra::DMatrix;
 
 fn main() {
-    let test_hex: &[u8; 2] = b"\x29";
+    let test_hex: &[u8; 1] = b"\x29";
     let t = 6;
     let n = 6;
     let a = og_matrix(t, n);
     let c = share_leaks(test_hex, t, n, a.clone());
-    let errors = 2;
     let vec = Vec::from_iter(c.keys());
     let vec2 = Vec::from_iter(c.values());
     println!("VECTOR {:?}", vec);
