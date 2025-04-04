@@ -7,7 +7,7 @@ use sss::{commitment, reconstruct_bytes, share_bytes};
 //sss::{mds, og_matrix, reconstruct_bytes, reconstruct_leak, share_bytes, share_leaks};
 
 fn main() {
-    let test_hex: &[u8; 1] = b"\x29";
+    let test_hex: &[u8; 2] = b"\x29\x04";
     let mut rng = thread_rng();
     let r_msg = u8::rand(&mut rng);
     println!("{:?}", r_msg);
